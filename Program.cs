@@ -10,29 +10,39 @@ class Program : IMMNotificationClient, IDisposable
 
     private readonly MMDeviceEnumerator enumerator = new();
 
-    private string? fallbackPlaybackId;
-    private string? fallbackCaptureId;
+    private MMDevice? playbackFallback;
+    private MMDevice? captureFallback;
+    private bool debug = false;
 
     PolicyConfigClient client = new PolicyConfigClient();
 
-    public Program(string deviceName)
+    public Program(string deviceName, bool debug)
     {
+        this.debug = debug;
         this.deviceName = deviceName;
         enumerator.RegisterEndpointNotificationCallback(this);
 
-        fallbackPlaybackId = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia).ID;
-        fallbackCaptureId = enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia).ID;
+        playbackFallback = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+        captureFallback = enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia);
+
+        if (debug) {
+            Console.WriteLine("Watching device " + deviceName + "\n");
+            Console.WriteLine("Playback fallback: " + playbackFallback?.FriendlyName);
+            Console.WriteLine("Capture fallback: " + captureFallback?.FriendlyName);
+        }
     }
 
     static void Main(string[] args)
     {
-        if (args.Length < 1)
+        var debug = args.Contains("--debug", StringComparer.OrdinalIgnoreCase);
+
+        if (args.Length < 1 || args.Length == 1 && debug)
         {
             Console.WriteLine("Usage: AutoAudioSwitcher <DeviceName>");
             return;
         }
 
-        using var p = new Program(args[0]);
+        using var p = new Program(args[0], debug);
         Thread.Sleep(Timeout.Infinite);
     }
 
@@ -40,6 +50,8 @@ class Program : IMMNotificationClient, IDisposable
     {
         var dev = SafeGetDevice(deviceId);
         if (dev == null) return;
+
+        if (debug) Console.WriteLine("Property " + key.propertyId + " of " + dev.DeviceFriendlyName + " changed to " + dev.Properties[key]?.Value?.ToString());
 
         if (dev.DeviceFriendlyName != deviceName || key.propertyId != KEY_PROPERTY_ID)
             return;
@@ -67,12 +79,12 @@ class Program : IMMNotificationClient, IDisposable
         if (device.DeviceFriendlyName == deviceName) return;
 
         if (flow == DataFlow.Render) {
-            if (fallbackPlaybackId == id) return;
-            fallbackPlaybackId = id;
+            if (playbackFallback?.ID == id) return;
+            playbackFallback = device;
         }
         else if (flow == DataFlow.Capture) {
-            if (fallbackCaptureId == id) return;
-            fallbackCaptureId = id;
+            if (captureFallback?.ID == id) return;
+            captureFallback = device;
         }
 
     }
@@ -93,6 +105,7 @@ class Program : IMMNotificationClient, IDisposable
         {
             enumerator.EnumerateAudioEndPoints(DataFlow.All, DeviceState.Active).ToList().ForEach(device => {
                 if (device.DeviceFriendlyName == deviceName) {
+                    if (debug) Console.WriteLine("Setting default device to: " + device.FriendlyName);
                     client.SetDefaultEndpoint(device.ID, ERole.eConsole);
                     client.SetDefaultEndpoint(device.ID, ERole.eMultimedia);
                     client.SetDefaultEndpoint(device.ID, ERole.eCommunications);
@@ -101,39 +114,44 @@ class Program : IMMNotificationClient, IDisposable
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Error setting default: " + ex.Message);
+            if (debug) Console.WriteLine("Error setting default playback device: " + ex.Message);
         }
     }
 
     private void RestorePlaybackFallback()
     {
-        if (fallbackPlaybackId == null) return;
+        if (playbackFallback == null) return;
+
+        if (debug) Console.WriteLine("Restoring default playback device to: " + playbackFallback.FriendlyName);
+
 
         try
         {
-            client.SetDefaultEndpoint(fallbackPlaybackId, ERole.eConsole);
-            client.SetDefaultEndpoint(fallbackPlaybackId, ERole.eMultimedia);
-            client.SetDefaultEndpoint(fallbackPlaybackId, ERole.eCommunications);
+            client.SetDefaultEndpoint(playbackFallback.ID, ERole.eConsole);
+            client.SetDefaultEndpoint(playbackFallback.ID, ERole.eMultimedia);
+            client.SetDefaultEndpoint(playbackFallback.ID, ERole.eCommunications);
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Error restoring playback device: " + ex.Message);
+            if (debug) Console.WriteLine("Error restoring default playback device: " + ex.Message);
         }
     }
 
     private void RestoreCaptureFallback()
     {
-        if (fallbackCaptureId == null) return;
+        if (captureFallback == null) return;
+
+        if (debug) Console.WriteLine("Restoring default capture device to: " + captureFallback.FriendlyName);
 
         try
         {
-            client.SetDefaultEndpoint(fallbackCaptureId, ERole.eConsole);
-            client.SetDefaultEndpoint(fallbackCaptureId, ERole.eMultimedia);
-            client.SetDefaultEndpoint(fallbackCaptureId, ERole.eCommunications);
+            client.SetDefaultEndpoint(captureFallback.ID, ERole.eConsole);
+            client.SetDefaultEndpoint(captureFallback.ID, ERole.eMultimedia);
+            client.SetDefaultEndpoint(captureFallback.ID, ERole.eCommunications);
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Error restoring capture device: " + ex.Message);
+            if (debug) Console.WriteLine("Error restoring default capture device: " + ex.Message);
         }
     }
 
