@@ -10,6 +10,8 @@ Warning: this is vibe-coded. I haven't the slightest idea about .NET, C# or Wind
 AutoAudioSwitcher "Logitech PRO X Wireless Gaming Headset"
 ```
 
+This runs the program in the background. Add it to Windows startup to run it automatically.
+
 ## Development
 
 ```
