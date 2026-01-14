@@ -1,13 +1,21 @@
 # Auto Audio Switcher
 
-## Development
+Some wireless headsets have a minor inconvenience where Windows doesn't automatically switch to them when you turn them on. This program aims to fix that by monitoring events and switching to the new device when its name matches the specified pattern.
 
-```
-dotnet build -c Release
-```
+Warning: this is vibe-coded. I haven't the slightest idea about .NET, C# or Windows APIs. Use at your own risk.
 
 ## Usage
 
 ```
 AutoAudioSwitcher "Logitech PRO X Wireless Gaming Headset"
 ```
+
+## Development
+
+```
+dotnet build -c Release
+```
+
+## License
+
+ISC
