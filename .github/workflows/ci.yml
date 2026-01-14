@@ -18,6 +18,13 @@ jobs:
         run: dotnet restore
       - name: Build
         run: dotnet build -c Release --no-restore
+      - name: Upload the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Release
+          path: |
+            bin/Release/net10.0/*
+            !**/*.json
       - name: Release
         uses: actions/create-release@v1
         env:
