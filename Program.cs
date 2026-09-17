@@ -1,4 +1,5 @@
-﻿using NAudio.CoreAudioApi;
+﻿using System.Diagnostics;
+using NAudio.CoreAudioApi;
 using NAudio.CoreAudioApi.Interfaces;
 using CoreAudioApi;
 
@@ -34,11 +35,26 @@ class Program : IMMNotificationClient, IDisposable
 
     static void Main(string[] args)
     {
-        var debug = args.Contains("--debug", StringComparer.OrdinalIgnoreCase);
+        var debug = false;
+        var background = false;
+        string? deviceName = null;
 
-        if (args.Length < 1 || args.Length == 1 && debug)
+        foreach (var arg in args)
         {
-            Console.WriteLine("Usage: AutoAudioSwitcher <DeviceName>");
+            if (arg.Equals("--debug", StringComparison.OrdinalIgnoreCase))
+                debug = true;
+            else if (arg.Equals("--bg", StringComparison.OrdinalIgnoreCase))
+                background = true;
+            else if (deviceName == null)
+                deviceName = arg;
+        }
+
+        if (deviceName == null)
+        {
+            Console.WriteLine("Usage: AutoAudioSwitcher <DeviceName> [--bg] [--debug]");
+            Console.WriteLine();
+            Console.WriteLine("  --bg     Run in the background (no console window)");
+            Console.WriteLine("  --debug  Print diagnostic output");
             Console.WriteLine();
             Console.WriteLine("Available devices:");
             using var enumerator = new MMDeviceEnumerator();
@@ -51,8 +67,37 @@ class Program : IMMNotificationClient, IDisposable
             return;
         }
 
-        using var p = new Program(args[0], debug);
+        if (background)
+        {
+            StartInBackground(deviceName, debug);
+            return;
+        }
+
+        using var p = new Program(deviceName, debug);
         Thread.Sleep(Timeout.Infinite);
+    }
+
+    static void StartInBackground(string deviceName, bool debug)
+    {
+        var exe = Environment.ProcessPath;
+        if (string.IsNullOrEmpty(exe))
+        {
+            Console.WriteLine("Unable to start in background: could not determine executable path.");
+            return;
+        }
+
+        var startInfo = new ProcessStartInfo(exe)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WindowStyle = ProcessWindowStyle.Hidden,
+            WorkingDirectory = Environment.CurrentDirectory,
+        };
+        startInfo.ArgumentList.Add(deviceName);
+        if (debug)
+            startInfo.ArgumentList.Add("--debug");
+
+        using var process = Process.Start(startInfo);
     }
 
     public void OnPropertyValueChanged(string deviceId, PropertyKey key)

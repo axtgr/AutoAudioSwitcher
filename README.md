@@ -10,7 +10,15 @@ Warning: this is vibe-coded. I haven't the slightest idea about .NET, C# or Wind
 AutoAudioSwitcher "Logitech PRO X Wireless Gaming Headset"
 ```
 
-This runs the program in the background. Add it to Windows startup to run it automatically.
+This runs in a console window. Close the window or press Ctrl+C to stop.
+
+To run in the background (no console window), pass `--bg`:
+
+```
+AutoAudioSwitcher "Logitech PRO X Wireless Gaming Headset" --bg
+```
+
+Add the `--bg` form to Windows startup to run it automatically.
 
 Run with no arguments to print a list of available device names:
 
