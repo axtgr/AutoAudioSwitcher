@@ -13,37 +13,30 @@ class Program : IMMNotificationClient, IDisposable
 
     private MMDevice? playbackFallback;
     private MMDevice? captureFallback;
-    private bool debug = false;
 
     PolicyConfigClient client = new PolicyConfigClient();
 
-    public Program(string deviceName, bool debug)
+    public Program(string deviceName)
     {
-        this.debug = debug;
         this.deviceName = deviceName;
         enumerator.RegisterEndpointNotificationCallback(this);
 
         playbackFallback = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
         captureFallback = enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia);
 
-        if (debug) {
-            Console.WriteLine("Watching device " + deviceName + "\n");
-            Console.WriteLine("Playback fallback: " + playbackFallback?.FriendlyName);
-            Console.WriteLine("Capture fallback: " + captureFallback?.FriendlyName);
-        }
+        Console.WriteLine("Watching device " + deviceName + "\n");
+        Console.WriteLine("Playback fallback: " + playbackFallback?.FriendlyName);
+        Console.WriteLine("Capture fallback: " + captureFallback?.FriendlyName);
     }
 
     static void Main(string[] args)
     {
-        var debug = false;
         var background = false;
         string? deviceName = null;
 
         foreach (var arg in args)
         {
-            if (arg.Equals("--debug", StringComparison.OrdinalIgnoreCase))
-                debug = true;
-            else if (arg.Equals("--bg", StringComparison.OrdinalIgnoreCase))
+            if (arg.Equals("--bg", StringComparison.OrdinalIgnoreCase))
                 background = true;
             else if (deviceName == null)
                 deviceName = arg;
@@ -51,10 +44,9 @@ class Program : IMMNotificationClient, IDisposable
 
         if (deviceName == null)
         {
-            Console.WriteLine("Usage: AutoAudioSwitcher <DeviceName> [--bg] [--debug]");
+            Console.WriteLine("Usage: AutoAudioSwitcher <DeviceName> [--bg]");
             Console.WriteLine();
-            Console.WriteLine("  --bg     Run in the background (no console window)");
-            Console.WriteLine("  --debug  Print diagnostic output");
+            Console.WriteLine("  --bg  Run in the background (no console window)");
             Console.WriteLine();
             Console.WriteLine("Available devices:");
             using var enumerator = new MMDeviceEnumerator();
@@ -69,15 +61,15 @@ class Program : IMMNotificationClient, IDisposable
 
         if (background)
         {
-            StartInBackground(deviceName, debug);
+            StartInBackground(deviceName);
             return;
         }
 
-        using var p = new Program(deviceName, debug);
+        using var p = new Program(deviceName);
         Thread.Sleep(Timeout.Infinite);
     }
 
-    static void StartInBackground(string deviceName, bool debug)
+    static void StartInBackground(string deviceName)
     {
         var exe = Environment.ProcessPath;
         if (string.IsNullOrEmpty(exe))
@@ -94,8 +86,6 @@ class Program : IMMNotificationClient, IDisposable
             WorkingDirectory = Environment.CurrentDirectory,
         };
         startInfo.ArgumentList.Add(deviceName);
-        if (debug)
-            startInfo.ArgumentList.Add("--debug");
 
         using var process = Process.Start(startInfo);
     }
@@ -105,7 +95,7 @@ class Program : IMMNotificationClient, IDisposable
         var dev = SafeGetDevice(deviceId);
         if (dev == null) return;
 
-        if (debug) Console.WriteLine("Property " + key.propertyId + " of " + dev.DeviceFriendlyName + " changed to " + dev.Properties[key]?.Value?.ToString());
+        // Console.WriteLine("Property " + key.propertyId + " of " + dev.DeviceFriendlyName + " changed to " + dev.Properties[key]?.Value?.ToString());
 
         if (dev.DeviceFriendlyName != deviceName || key.propertyId != KEY_PROPERTY_ID)
             return;
@@ -159,7 +149,7 @@ class Program : IMMNotificationClient, IDisposable
         {
             enumerator.EnumerateAudioEndPoints(DataFlow.All, DeviceState.Active).ToList().ForEach(device => {
                 if (device.DeviceFriendlyName == deviceName) {
-                    if (debug) Console.WriteLine("Setting default device to: " + device.FriendlyName);
+                    Console.WriteLine("Setting default device to: " + device.FriendlyName);
                     client.SetDefaultEndpoint(device.ID, ERole.eConsole);
                     client.SetDefaultEndpoint(device.ID, ERole.eMultimedia);
                     client.SetDefaultEndpoint(device.ID, ERole.eCommunications);
@@ -168,7 +158,7 @@ class Program : IMMNotificationClient, IDisposable
         }
         catch (Exception ex)
         {
-            if (debug) Console.WriteLine("Error setting default playback device: " + ex.Message);
+            Console.WriteLine("Error setting default playback device: " + ex.Message);
         }
     }
 
@@ -176,7 +166,7 @@ class Program : IMMNotificationClient, IDisposable
     {
         if (playbackFallback == null) return;
 
-        if (debug) Console.WriteLine("Restoring default playback device to: " + playbackFallback.FriendlyName);
+        Console.WriteLine("Restoring default playback device to: " + playbackFallback.FriendlyName);
 
 
         try
@@ -187,7 +177,7 @@ class Program : IMMNotificationClient, IDisposable
         }
         catch (Exception ex)
         {
-            if (debug) Console.WriteLine("Error restoring default playback device: " + ex.Message);
+            Console.WriteLine("Error restoring default playback device: " + ex.Message);
         }
     }
 
@@ -195,7 +185,7 @@ class Program : IMMNotificationClient, IDisposable
     {
         if (captureFallback == null) return;
 
-        if (debug) Console.WriteLine("Restoring default capture device to: " + captureFallback.FriendlyName);
+        Console.WriteLine("Restoring default capture device to: " + captureFallback.FriendlyName);
 
         try
         {
@@ -205,7 +195,7 @@ class Program : IMMNotificationClient, IDisposable
         }
         catch (Exception ex)
         {
-            if (debug) Console.WriteLine("Error restoring default capture device: " + ex.Message);
+            Console.WriteLine("Error restoring default capture device: " + ex.Message);
         }
     }
 

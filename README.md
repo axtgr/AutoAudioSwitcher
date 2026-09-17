@@ -10,7 +10,7 @@ Warning: this is vibe-coded. I haven't the slightest idea about .NET, C# or Wind
 AutoAudioSwitcher "Logitech PRO X Wireless Gaming Headset"
 ```
 
-This runs in a console window. Close the window or press Ctrl+C to stop.
+This runs in a console window and prints status as devices change. Close the window or press Ctrl+C to stop.
 
 To run in the background (no console window), pass `--bg`:
 
