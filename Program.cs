@@ -39,6 +39,15 @@ class Program : IMMNotificationClient, IDisposable
         if (args.Length < 1 || args.Length == 1 && debug)
         {
             Console.WriteLine("Usage: AutoAudioSwitcher <DeviceName>");
+            Console.WriteLine();
+            Console.WriteLine("Available devices:");
+            using var enumerator = new MMDeviceEnumerator();
+            foreach (var name in enumerator.EnumerateAudioEndPoints(DataFlow.All, DeviceState.Active)
+                .Select(device => device.DeviceFriendlyName)
+                .Distinct())
+            {
+                Console.WriteLine("- " + name);
+            }
             return;
         }
 

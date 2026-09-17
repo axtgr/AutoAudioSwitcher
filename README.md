@@ -12,6 +12,12 @@ AutoAudioSwitcher "Logitech PRO X Wireless Gaming Headset"
 
 This runs the program in the background. Add it to Windows startup to run it automatically.
 
+Run with no arguments to print a list of available device names:
+
+```
+AutoAudioSwitcher
+```
+
 ## Development
 
 ```
