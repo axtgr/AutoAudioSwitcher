@@ -8,6 +8,7 @@ class Program : IMMNotificationClient, IDisposable
 {
     private readonly string deviceName;
     private const int KEY_PROPERTY_ID = 100;
+    private readonly object switchLock = new();
 
     private readonly MMDeviceEnumerator enumerator = new();
 
@@ -21,8 +22,8 @@ class Program : IMMNotificationClient, IDisposable
         this.deviceName = deviceName;
         enumerator.RegisterEndpointNotificationCallback(this);
 
-        playbackFallback = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-        captureFallback = enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia);
+        playbackFallback = FindFallback(DataFlow.Render);
+        captureFallback = FindFallback(DataFlow.Capture);
 
         Console.WriteLine("Watching device " + deviceName + "\n");
         Console.WriteLine("Playback fallback: " + playbackFallback?.FriendlyName);
@@ -92,24 +93,36 @@ class Program : IMMNotificationClient, IDisposable
 
     public void OnPropertyValueChanged(string deviceId, PropertyKey key)
     {
+        if (key.propertyId != KEY_PROPERTY_ID) return;
+
+        // Callbacks run on a Windows audio worker that holds an internal lock.
+        // Switching the default endpoint here deadlocks other WASAPI clients.
+        var capturedId = deviceId;
+        var capturedKey = key;
+        ThreadPool.QueueUserWorkItem(_ => HandlePropertyChange(capturedId, capturedKey));
+    }
+
+    private void HandlePropertyChange(string deviceId, PropertyKey key)
+    {
         var dev = SafeGetDevice(deviceId);
-        if (dev == null) return;
+        if (dev == null || dev.DeviceFriendlyName != deviceName) return;
 
-        // Console.WriteLine("Property " + key.propertyId + " of " + dev.DeviceFriendlyName + " changed to " + dev.Properties[key]?.Value?.ToString());
+        var propertyValue = dev.Properties[key]?.Value?.ToString();
 
-        if (dev.DeviceFriendlyName != deviceName || key.propertyId != KEY_PROPERTY_ID)
-            return;
-
-        var propertyValue = dev.Properties[key]?.Value;
-
-        if (propertyValue?.ToString() == "1")
+        if (propertyValue == "1")
         {
-            SetAsDefault();
+            lock (switchLock)
+            {
+                SetAsDefault();
+            }
         }
-        else if (propertyValue?.ToString() == "0")
+        else if (propertyValue == "0")
         {
-            RestorePlaybackFallback();
-            RestoreCaptureFallback();
+            lock (switchLock)
+            {
+                RestorePlaybackFallback();
+                RestoreCaptureFallback();
+            }
         }
     }
 
@@ -130,7 +143,6 @@ class Program : IMMNotificationClient, IDisposable
             if (captureFallback?.ID == id) return;
             captureFallback = device;
         }
-
     }
 
     public void OnDeviceStateChanged(string id, DeviceState state) { }
@@ -143,18 +155,31 @@ class Program : IMMNotificationClient, IDisposable
         catch { return null; }
     }
 
+    private MMDevice? FindFallback(DataFlow flow)
+    {
+        try
+        {
+            var current = enumerator.GetDefaultAudioEndpoint(flow, Role.Multimedia);
+            if (current.DeviceFriendlyName != deviceName)
+                return current;
+        }
+        catch { }
+
+        return enumerator.EnumerateAudioEndPoints(flow, DeviceState.Active)
+            .FirstOrDefault(device => device.DeviceFriendlyName != deviceName);
+    }
+
     private void SetAsDefault()
     {
         try
         {
-            enumerator.EnumerateAudioEndPoints(DataFlow.All, DeviceState.Active).ToList().ForEach(device => {
-                if (device.DeviceFriendlyName == deviceName) {
+            enumerator.EnumerateAudioEndPoints(DataFlow.All, DeviceState.Active)
+                .Where(device => device.DeviceFriendlyName == deviceName)
+                .ToList()
+                .ForEach(device => {
                     Console.WriteLine("Setting default device to: " + device.FriendlyName);
-                    client.SetDefaultEndpoint(device.ID, ERole.eConsole);
-                    client.SetDefaultEndpoint(device.ID, ERole.eMultimedia);
-                    client.SetDefaultEndpoint(device.ID, ERole.eCommunications);
-                }
-            });
+                    SetEndpointRoles(device.ID);
+                });
         }
         catch (Exception ex)
         {
@@ -162,18 +187,24 @@ class Program : IMMNotificationClient, IDisposable
         }
     }
 
+    private void SetEndpointRoles(string deviceId)
+    {
+        // TeamSpeak 3.6.x deadlocks if the default communications endpoint changes.
+        foreach (var role in new[] { ERole.eConsole, ERole.eMultimedia })
+        {
+            client.SetDefaultEndpoint(deviceId, role);
+        }
+    }
+
     private void RestorePlaybackFallback()
     {
-        if (playbackFallback == null) return;
+        if (playbackFallback == null || playbackFallback.DeviceFriendlyName == deviceName) return;
 
         Console.WriteLine("Restoring default playback device to: " + playbackFallback.FriendlyName);
 
-
         try
         {
-            client.SetDefaultEndpoint(playbackFallback.ID, ERole.eConsole);
-            client.SetDefaultEndpoint(playbackFallback.ID, ERole.eMultimedia);
-            client.SetDefaultEndpoint(playbackFallback.ID, ERole.eCommunications);
+            SetEndpointRoles(playbackFallback.ID);
         }
         catch (Exception ex)
         {
@@ -183,15 +214,13 @@ class Program : IMMNotificationClient, IDisposable
 
     private void RestoreCaptureFallback()
     {
-        if (captureFallback == null) return;
+        if (captureFallback == null || captureFallback.DeviceFriendlyName == deviceName) return;
 
         Console.WriteLine("Restoring default capture device to: " + captureFallback.FriendlyName);
 
         try
         {
-            client.SetDefaultEndpoint(captureFallback.ID, ERole.eConsole);
-            client.SetDefaultEndpoint(captureFallback.ID, ERole.eMultimedia);
-            client.SetDefaultEndpoint(captureFallback.ID, ERole.eCommunications);
+            SetEndpointRoles(captureFallback.ID);
         }
         catch (Exception ex)
         {
