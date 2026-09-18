@@ -4,33 +4,49 @@ Some wireless headsets have a minor inconvenience where Windows doesn't automati
 
 Warning: this is vibe-coded. I haven't the slightest idea about .NET, C# or Windows APIs. Use at your own risk.
 
+
 ## Usage
+
+Run from the console without any arguments:
+
+```
+AutoAudioSwitcher
+```
+
+This will print a list of available devices:
+
+```
+Available devices:
+- Logitech PRO X Wireless Gaming Headset
+- Realtek USB2.0 Audio
+- Logi C525 HD WebCam
+```
+
+Pick a device you want to automatically switch to and copy its name. Then run the app with the device name as an argument:
 
 ```
 AutoAudioSwitcher "Logitech PRO X Wireless Gaming Headset"
 ```
 
-This runs in a console window and prints status as devices change. Close the window or press Ctrl+C to stop.
+This will run the program in the foreground, monitor the device events and print them. Try turning the device on/off. The program should print a message, and the default audio device in the system should change.
 
-To run in the background (no console window), pass `--bg`:
+To run the program in the background, pass `--bg`:
 
 ```
 AutoAudioSwitcher "Logitech PRO X Wireless Gaming Headset" --bg
 ```
 
-Add the `--bg` form to Windows startup to run it automatically.
+This should immediately return and let you close the console window. The process, however, should stay visible in Task Manager.
 
-Run with no arguments to print a list of available device names:
+Add the last command to Windows startup to run it automatically on system start.
 
-```
-AutoAudioSwitcher
-```
 
 ## Development
 
 ```
 dotnet build -c Release
 ```
+
 
 ## License
 
