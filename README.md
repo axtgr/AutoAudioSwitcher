@@ -44,8 +44,10 @@ Add the last command to Windows startup to run it automatically on system start.
 ## Development
 
 ```
-dotnet build -c Release
+dotnet publish -c Release
 ```
+
+This produces a single executable at `bin/Release/net10.0/win-x64/publish/AutoAudioSwitcher.exe`. The .NET 10 runtime must be installed on the target machine.
 
 
 ## License
